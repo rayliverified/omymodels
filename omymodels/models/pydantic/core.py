@@ -42,6 +42,10 @@ class ModelGenerator:
             _type = f"List[{_type}]"
         if _type == "UUID":
             self.uuid_import = True
+        if "List" in _type:
+            self.typing_imports.add("List")
+        if "Any" == _type:
+            self.typing_imports.add("Any")
         return _type
 
     def generate_attr(self, column: Column, defaults_off: bool) -> str:
@@ -100,7 +104,7 @@ class ModelGenerator:
                          class_name=create_class_name(table.name, singular, exceptions),
                          table_name=table.name,
                      )
-                 ) + "\n\n"
+                 ) + "\n"
 
         for column in table.columns:
             column = t.prepare_column_data(column)
