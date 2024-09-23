@@ -110,12 +110,6 @@ def adjust_type_mappings():
 
     # Map 'tinyint(1)' to 'bool'
     types.types_mapping.update({"tinyint(1)": "bool"})
-    # Map 'tinyint' to 'int' if needed
-    types.types_mapping.update({"tinyint": "int"})
-    # Map 'longtext' and 'text' to 'str'
-    types.types_mapping.update({"longtext": "str"})
-    types.types_mapping.update({"text": "str"})
-    # Add more mappings as necessary
 
 
 def generate_pydantic_models(ddl_file, models_output_file):
