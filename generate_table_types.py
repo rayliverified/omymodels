@@ -53,13 +53,15 @@ def export_mysql_schema(user, password, host, database, output_file):
 
 
 def clean_ddl(input_file, output_file):
-    """Cleans up the SQL DDL to remove MySQL-specific syntax."""
+    """Cleans up the SQL DDL to remove MySQL-specific syntax and undesired code."""
     with open(input_file, "r") as f:
         lines = f.readlines()
 
     cleaned_lines = []
+    skip_block = False
     for line in lines:
         stripped_line = line.strip()
+
         # Skip MySQL-specific comments and commands
         if stripped_line.startswith("/*!") and stripped_line.endswith("*/;"):
             continue
@@ -71,6 +73,21 @@ def clean_ddl(input_file, output_file):
         # Remove ENGINE and CHARSET options if desired
         if "ENGINE=" in line:
             line = line.split("ENGINE=")[0].rstrip(" ,\n") + ";\n"
+
+        # Start skipping blocks that begin with /*!50001 CREATE VIEW
+        if stripped_line.startswith("/*!"):
+            skip_block = True
+            continue
+
+        # Stop skipping when we reach the end of the block
+        if skip_block and stripped_line.endswith("*/;"):
+            skip_block = False
+            continue
+
+        # Skip lines while we're in a block to be removed
+        if skip_block:
+            continue
+
         cleaned_lines.append(line)
 
     with open(output_file, "w") as f:
@@ -107,22 +124,17 @@ def generate_pydantic_models(ddl_file, models_output_file):
 
 
 if __name__ == "__main__":
-    # Replace these with your actual database credentials
     user = "root"
     password = ""
     host = "localhost"
     database = "nocd_v2"
 
-    """Automates the entire process from database reset to model generation."""
+    """Automates the table models generation."""
     schema_file = "V001__tables_baseline.sql"
     cleaned_schema_file = "V001__tables_baseline_cleaned.sql"
     models_output_file = "models.py"
 
-    # Step 1: Reset database using sql-up.sh
-    # init_database()
-    # Step 2: Export schema
-    # export_mysql_schema(user, password, host, database, schema_file)
-    # Step 3: Clean up DDL
+    print("Running...")
+
     # clean_ddl(schema_file, cleaned_schema_file)
-    # Step 4: Generate Pydantic models
     generate_pydantic_models(cleaned_schema_file, models_output_file)
