@@ -1,28 +1,8 @@
-import os
 import subprocess
 import sys
 
 
-def init_database():
-    """Calls the sql-up.sh script to reset the database."""
-    try:
-        # Path to the sql-up.sh script relative to the Python script
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        sql_up_script = os.path.join(script_dir, "..", "database", "sql-up.sh")
-
-        # Ensure sql-up.sh is executable
-        subprocess.run(["chmod", "+x", sql_up_script], check=True)
-
-        # Run the script
-        subprocess.run([sql_up_script], check=True, text=True)
-        print("Database reset and migrations applied successfully using sql-up.sh.")
-    except subprocess.CalledProcessError as e:
-        print("Error resetting database with sql-up.sh:")
-        print(e)
-        sys.exit(1)
-
-
-def export_mysql_schema(user, password, host, database, output_file):
+def export_mysql_schema(user, host, database, output_file):
     """Exports the MySQL schema to a SQL file using mysqldump."""
     command = [
         "mysqldump",
@@ -128,7 +108,6 @@ def generate_pydantic_models(ddl_file, models_output_file):
 
 if __name__ == "__main__":
     user = "root"
-    password = ""
     host = "localhost"
     database = "nocd_v2"
 
@@ -137,7 +116,6 @@ if __name__ == "__main__":
     cleaned_schema_file = "V001__tables_baseline_cleaned.sql"
     models_output_file = "models.py"
 
-    print("Running...")
-
+    # export_mysql_schema(user, host, database, schema_file)
     clean_ddl(schema_file, cleaned_schema_file)
     generate_pydantic_models(cleaned_schema_file, models_output_file)
