@@ -73,6 +73,15 @@ def clean_ddl(input_file, output_file):
         # Remove ENGINE and CHARSET options if desired
         if "ENGINE=" in line:
             line = line.split("ENGINE=")[0].rstrip(" ,\n") + ";\n"
+        # Remove CONSTRAINT lines
+        if stripped_line.startswith("CONSTRAINT"):
+            continue
+        # Remove UNIQUE KEY lines
+        if stripped_line.startswith("UNIQUE KEY"):
+            continue
+        # Remove PRIMARY KEY lines
+        if stripped_line.startswith("PRIMARY KEY"):
+            continue
 
         # Start skipping blocks that begin with /*!50001 CREATE VIEW
         if stripped_line.startswith("/*!"):
@@ -136,5 +145,5 @@ if __name__ == "__main__":
 
     print("Running...")
 
-    # clean_ddl(schema_file, cleaned_schema_file)
+    clean_ddl(schema_file, cleaned_schema_file)
     generate_pydantic_models(cleaned_schema_file, models_output_file)
