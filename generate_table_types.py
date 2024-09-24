@@ -90,14 +90,34 @@ def clean_ddl(input_file, output_file):
         # Handle enum fields
         if "enum(" in line:
             enum_start = line.find("enum(")
-            enum_end = line.find(")", enum_start) + 1
-            line = line[:enum_end] + ",\n"
+            enum_end = find_closing_parenthesis(line, enum_start)
+            if enum_end != -1:
+                line = line[: enum_end + 1] + ",\n"
+
+        # Handle set fields
+        if "set(" in line:
+            set_start = line.find("set(")
+            set_end = find_closing_parenthesis(line, set_start)
+            if set_end != -1:
+                line = line[: set_end + 1] + ",\n"
 
         cleaned_lines.append(line)
 
     with open(output_file, "w") as f:
         f.writelines(cleaned_lines)
     print(f"Cleaned DDL saved to {output_file}")
+
+
+def find_closing_parenthesis(s, start):
+    count = 0
+    for i in range(start, len(s)):
+        if s[i] == "(":
+            count += 1
+        elif s[i] == ")":
+            count -= 1
+            if count == 0:
+                return i
+    return -1  # No matching closing parenthesis found
 
 
 def adjust_type_mappings():
