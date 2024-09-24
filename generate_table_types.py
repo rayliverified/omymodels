@@ -62,6 +62,11 @@ def clean_ddl(input_file, output_file):
         # Remove PRIMARY KEY lines
         if stripped_line.startswith("PRIMARY KEY"):
             continue
+        if stripped_line.startswith("FULLTEXT KEY"):
+            continue
+        # Remove KEY lines
+        if stripped_line.startswith("KEY "):
+            continue
 
         # Start skipping blocks that begin with /*!50001 CREATE VIEW
         if stripped_line.startswith("/*!"):
@@ -77,6 +82,17 @@ def clean_ddl(input_file, output_file):
         if skip_block:
             continue
 
+        # Handle GENERATED columns
+        if "GENERATED" in line:
+            generated_index = line.index("GENERATED")
+            line = line[:generated_index].rstrip() + ",\n"
+
+        # Handle enum fields
+        if "enum(" in line:
+            enum_start = line.find("enum(")
+            enum_end = line.find(")", enum_start) + 1
+            line = line[:enum_end] + ",\n"
+
         cleaned_lines.append(line)
 
     with open(output_file, "w") as f:
@@ -90,6 +106,7 @@ def adjust_type_mappings():
 
     # Map 'tinyint(1)' to 'bool'
     types.types_mapping.update({"tinyint(1)": "bool"})
+    types.types_mapping.update({"enum": "str"})
 
 
 def generate_pydantic_models(ddl_file, models_output_file):
