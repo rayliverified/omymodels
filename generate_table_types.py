@@ -83,9 +83,9 @@ def clean_ddl(input_file, output_file):
             continue
 
         # Handle GENERATED columns
-        if "GENERATED" in line:
-            generated_index = line.index("GENERATED")
-            line = line[:generated_index].rstrip() + ",\n"
+        if "GENERATED ALWAYS AS" in line:
+            generated_index = line.index("GENERATED ALWAYS AS")
+            line = line[:generated_index].rstrip() + " GENERATED ALWAYS AS 1,\n"
 
         # Handle enum fields
         if "enum(" in line:
