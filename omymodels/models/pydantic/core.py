@@ -112,11 +112,9 @@ class ModelGenerator:
         if not self._is_valid_identifier(column.name):
             params.append(f'alias="{column.name}"')
 
-        if not any(t in column.type.lower() for t in ["json", "jsonb"]):
-            if column.default is not None and not defaults_off:
-                default_value = self.get_default_value(column)
-                if default_value:
-                    params.append(f"default={default_value}")
+        if column.default is not None and not defaults_off:
+            if default_value := self.get_default_value_string(column):
+                params.append(f"default{default_value.replace(' ', '')}")
 
         if column.generated_as is not None:
             params.append("exclude=True")
@@ -141,22 +139,50 @@ class ModelGenerator:
 
         return column.default
 
-    @staticmethod
-    def _is_valid_identifier(name: str) -> bool:
-        """Check if the given name is a valid Python identifier."""
-        return name.isidentifier() and not iskeyword(name)
+    @classmethod
+    def _is_valid_identifier(self, name: str) -> bool:
+        return (
+            name.isidentifier()
+            and not iskeyword(name)
+            and not self._is_pydantic_reserved_name(name)
+        )
 
-    @staticmethod
-    def _generate_valid_identifier(name: str) -> str:
+    @classmethod
+    def _is_pydantic_reserved_name(self, name: str) -> bool:
+        """Check if the name is a Pydantic-specific reserved name or starts with a reserved prefix."""
+        pydantic_reserved_prefixes = {"dict_", "json_"}
+        pydantic_reserved_names = {
+            "copy",
+            "parse_obj",
+            "parse_raw",
+            "parse_file",
+            "from_orm",
+            "construct",
+            "validate",
+            "update_forward_refs",
+            "schema",
+            "schema_json",
+            "register",
+        }
+        return (
+            any(name.startswith(prefix) for prefix in pydantic_reserved_prefixes)
+            or name in pydantic_reserved_names
+        )
+
+    @classmethod
+    def _generate_valid_identifier(self, name: str) -> str:
         """Generate a valid Python identifier from a given name."""
         # Replace non-alphanumeric characters with underscores
         valid_name = "".join(c if c.isalnum() else "_" for c in name)
+
         # Ensure the name doesn't start with a number
-        if valid_name[0].isdigit():
+        if (
+            valid_name[0].isdigit()
+            or iskeyword(valid_name)
+            or self._is_pydantic_reserved_name(valid_name)
+        ):
             valid_name = f"f_{valid_name}"
-        # Ensure it's not a Python keyword
-        if iskeyword(valid_name):
-            valid_name += "_"
+
         return valid_name
 
     @staticmethod
