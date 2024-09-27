@@ -122,11 +122,10 @@ def find_closing_parenthesis(s, start):
 
 def adjust_type_mappings():
     """Adjusts type mappings in OhMyModels for MySQL data types."""
-    from omymodels.models.pydantic import types
+    from omymodels.models.pydantic import types as pydantic_types
 
-    # Map 'tinyint(1)' to 'bool'
-    types.types_mapping.update({"tinyint(1)": "bool"})
-    types.types_mapping.update({"enum": "str"})
+    pydantic_types.types_mapping.update({"tinyint(1)": "bool"})
+    pydantic_types.types_mapping.update({"enum": "str"})
 
 
 def generate_pydantic_models(ddl_file, models_output_file):
