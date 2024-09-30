@@ -82,6 +82,10 @@ def clean_ddl(input_file, output_file):
         if skip_block:
             continue
 
+        # Replace CHARACTER SET with CHARACTER
+        if "CHARACTER SET" in line:
+            line = line.replace("CHARACTER SET", "CHARACTER")
+
         # Handle GENERATED columns
         if "GENERATED ALWAYS AS" in line:
             generated_index = line.index("GENERATED ALWAYS AS")
@@ -125,7 +129,8 @@ def adjust_type_mappings():
     from omymodels.models.pydantic import types as pydantic_types
 
     pydantic_types.types_mapping.update({"tinyint(1)": "bool"})
-    pydantic_types.types_mapping.update({"enum": "str"})
+    pydantic_types.types_mapping.update({"ENUM": "str"})
+    pydantic_types.types_mapping.update({"SET": "str"})
 
 
 def generate_pydantic_models(ddl_file, models_output_file):
