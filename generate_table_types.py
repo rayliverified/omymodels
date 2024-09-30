@@ -88,11 +88,11 @@ def clean_ddl(input_file, output_file):
             line = line[:generated_index].rstrip() + " GENERATED ALWAYS AS 1,\n"
 
         # Handle enum fields
-        if "enum(" in line:
-            enum_start = line.find("enum(")
-            enum_end = find_closing_parenthesis(line, enum_start)
-            if enum_end != -1:
-                line = line[: enum_end + 1] + ",\n"
+        # if "enum(" in line:
+        #     enum_start = line.find("enum(")
+        #     enum_end = find_closing_parenthesis(line, enum_start)
+        #     if enum_end != -1:
+        #         line = line[: enum_end + 1] + ",\n"
 
         # Handle set fields
         if "set(" in line:
@@ -135,7 +135,9 @@ def generate_pydantic_models(ddl_file, models_output_file):
 
     with open(ddl_file, "r") as f:
         ddl = f.read()
-    result = create_models(ddl, models_type="pydantic", no_auto_snake_case=True)
+    result = create_models(
+        ddl, models_type="pydantic", no_auto_snake_case=True, table_suffix="Item"
+    )
     models_code = result["code"]
     with open(models_output_file, "w") as f:
         f.write(models_code)
