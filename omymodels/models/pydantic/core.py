@@ -1,3 +1,4 @@
+from datetime import datetime
 from keyword import iskeyword
 from typing import List, Optional
 
@@ -7,14 +8,7 @@ import omymodels.types as types
 from omymodels.helpers import create_class_name, datetime_now_check
 from omymodels.models.pydantic import templates as pt
 from omymodels.models.pydantic import types as pydantic_types
-from omymodels.types import (
-    big_integer_types,
-    datetime_types,
-    integer_types,
-    string_types,
-    text_types,
-    types_mapping,
-)
+from omymodels.types import big_integer_types, integer_types, string_types, text_types
 
 
 class ModelGenerator:
@@ -22,6 +16,8 @@ class ModelGenerator:
         self.imports = {pt.base_model}
         self.types_for_import = ["Json"]
         self.datetime_import = False
+        self.date_import = False
+        self.time_import = False
         self.typing_imports = set()
         self.custom_types = {}
         self.uuid_import = False
@@ -41,11 +37,15 @@ class ModelGenerator:
             _type = type.split(".")[1]
         else:
             _type = type.split("[")[0]
-        _type = types_mapping.get(_type, _type)
+        _type = pydantic_types.types_mapping.get(_type, _type)
         if _type in self.types_for_import:
             self.imports.add(_type)
         elif "datetime" in _type:
             self.datetime_import = True
+        elif _type == "date":
+            self.date_import = True
+        elif _type == "time":
+            self.time_import = True
         elif "[" in type:
             self.typing_imports.add("List")
             _type = f"List[{_type}]"
@@ -127,17 +127,58 @@ class ModelGenerator:
         if column.default is None or column.default.lower() == "null":
             return ""
 
-        if column.type.lower() in datetime_types:
+        if column.type.lower() in ["datetime", "timestamp"]:
             if datetime_now_check(column.default.lower()):
                 self.datetime_import = True
                 return "datetime.now()"
             else:
                 return column.default.strip("'")
 
+        if column.type.lower() == "date":
+            self.date_import = True
+            return self._convert_to_date_string(column.default.strip("'"))
+
+        if column.type.lower() == "time":
+            self.time_import = True
+            return self._convert_to_time_string(column.default.strip("'"))
+
         if any(t in column.type.lower() for t in integer_types + big_integer_types):
             return column.default.strip("'")
 
         return column.default
+
+    @staticmethod
+    def get_default_value_string(column: Column) -> str:
+        # Handle datetime default values
+        if column.type.lower() in ["datetime", "timestamp"]:
+            if datetime_now_check(column.default.lower()):
+                column.default = "datetime.now()"
+        elif column.type.lower() == "date":
+            column.default = ModelGenerator._convert_to_date_string(
+                column.default.strip("'")
+            )
+        elif column.type.lower() == "time":
+            column.default = ModelGenerator._convert_to_time_string(
+                column.default.strip("'")
+            )
+
+        # If the default is 'NULL', don't set a default in Pydantic (it already defaults to None)
+        if column.default.lower() == "null":
+            return ""
+        if any(t in column.type.lower() for t in ["json", "jsonb"]):
+            return ""
+        if column.type.lower() == "any":
+            return ""
+
+        if any(t in column.type.lower() for t in integer_types + big_integer_types):
+            default_value = column.default.strip("'")
+        elif column.type.lower() == "bool":
+            default_value = "False" if column.default.strip("'") == "0" else "True"
+        else:
+            default_value = column.default
+
+        # Append the default value if it's not None (e.g., explicit default values like '0' or CURRENT_TIMESTAMP)
+        return pt.pydantic_default_attr.format(default=default_value)
 
     @classmethod
     def _is_valid_identifier(self, name: str) -> bool:
@@ -186,29 +227,20 @@ class ModelGenerator:
         return valid_name
 
     @staticmethod
-    def get_default_value_string(column: Column) -> str:
-        # Handle datetime default values
-        if column.type.lower() in datetime_types:
-            if datetime_now_check(column.default.lower()):
-                column.default = "datetime.now()"
+    def _convert_to_date_string(date_str: str) -> str:
+        try:
+            date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+            return f"date({date_obj.year}, {date_obj.month}, {date_obj.day})"
+        except ValueError:
+            return date_str  # Return original string if parsing fails
 
-        # If the default is 'NULL', don't set a default in Pydantic (it already defaults to None)
-        if column.default.lower() == "null":
-            return ""
-        if any(t in column.type.lower() for t in ["json", "jsonb"]):
-            return ""
-        if column.type.lower() == "any":
-            return ""
-
-        if any(t in column.type.lower() for t in integer_types + big_integer_types):
-            default_value = column.default.strip("'")
-        elif column.type.lower() == "bool":
-            default_value = "False" if column.default.strip("'") == "0" else "True"
-        else:
-            default_value = column.default
-
-        # Append the default value if it's not None (e.g., explicit default values like '0' or CURRENT_TIMESTAMP)
-        return pt.pydantic_default_attr.format(default=default_value)
+    @staticmethod
+    def _convert_to_time_string(time_str: str) -> str:
+        try:
+            time_obj = datetime.strptime(time_str, "%H:%M:%S").time()
+            return f"time({time_obj.hour}, {time_obj.minute}, {time_obj.second})"
+        except ValueError:
+            return time_str  # Return original string if parsing fails
 
     def generate_model(
         self,
@@ -248,8 +280,15 @@ class ModelGenerator:
         header = ""
         if self.uuid_import:
             header += pt.uuid_import + "\n"
-        if self.datetime_import:
-            header += pt.datetime_import + "\n"
+        if self.datetime_import or self.date_import or self.time_import:
+            imports = []
+            if self.datetime_import:
+                imports.append("datetime")
+            if self.date_import:
+                imports.append("date")
+            if self.time_import:
+                imports.append("time")
+            header += f"from datetime import {', '.join(imports)}\n"
         if self.typing_imports:
             _imports = list(self.typing_imports)
             _imports.sort()
