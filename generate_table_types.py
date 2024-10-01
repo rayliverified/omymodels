@@ -91,20 +91,6 @@ def clean_ddl(input_file, output_file):
             generated_index = line.index("GENERATED ALWAYS AS")
             line = line[:generated_index].rstrip() + " GENERATED ALWAYS AS 1,\n"
 
-        # Handle enum fields
-        # if "enum(" in line:
-        #     enum_start = line.find("enum(")
-        #     enum_end = find_closing_parenthesis(line, enum_start)
-        #     if enum_end != -1:
-        #         line = line[: enum_end + 1] + ",\n"
-
-        # Handle set fields
-        if "set(" in line:
-            set_start = line.find("set(")
-            set_end = find_closing_parenthesis(line, set_start)
-            if set_end != -1:
-                line = line[: set_end + 1] + ",\n"
-
         cleaned_lines.append(line)
 
     with open(output_file, "w") as f:
