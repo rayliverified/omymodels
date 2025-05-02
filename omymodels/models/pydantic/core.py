@@ -37,7 +37,7 @@ class ModelGenerator:
             _type = type.split(".")[1]
         else:
             _type = type.split("[")[0]
-            
+
         _type = pydantic_types.types_mapping.get(_type, _type)
         if _type in self.types_for_import:
             self.imports.add(_type)
@@ -99,6 +99,15 @@ class ModelGenerator:
             if column.default is not None and not defaults_off:
                 field_params = self.get_default_value_string(column)
 
+        # Handle reference collision: wrap type name in quotes if it's the same as field name
+        # and the field has a default value
+        if (
+            column.name.lower() == _type.lower()
+            and column.default is not None
+            and not defaults_off
+        ):
+            _type = f'"{_type}"'
+
         column_str = column_str.format(
             arg_name=arg_name,
             type=_type,
@@ -154,7 +163,15 @@ class ModelGenerator:
             if datetime_now_check(column.default.lower()):
                 column.default = "datetime.now()"
         elif column.type.lower() == "date":
-            column.default = self._convert_to_date_string(column.default.strip("'"))
+            # Add support for CURDATE() and CURRENT_DATE() functions
+            if (
+                "curdate" in column.default.lower()
+                or "current_date" in column.default.lower()
+            ):
+                # Handle the case when field name is also "date" to avoid reference collision
+                column.default = "date.today()"
+            else:
+                column.default = self._convert_to_date_string(column.default.strip("'"))
         elif column.type.lower() == "time":
             column.default = self._convert_to_time_string(column.default.strip("'"))
 
