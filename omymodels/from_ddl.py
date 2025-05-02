@@ -1,4 +1,5 @@
 import copy
+import logging
 import os
 import re
 import sys
@@ -22,11 +23,18 @@ def get_tables_information(
             "contains ddl or ddl_file that contains path to ddl file to parse"
         )
     if ddl:
-        tables = DDLParser(ddl, normalize_names=True).run(group_by_type=True)
+        tables = DDLParser(
+            ddl, normalize_names=True, log_file="parse_logs.py", silent=False
+        ).run(
+            group_by_type=True,
+        )
+        logging.info(f"Parsed {len(tables['tables'])} tables from DDL")
+        # logging.info(f"Tables: {tables['tables']}")
     elif ddl_file:
         tables = parse_from_file(
             ddl_file, parser_settings={"normalize_names": True}, group_by_type=True
         )
+        # logging.info(f"Parsed {len(tables['tables'])} tables from DDL")
     return tables
 
 
@@ -86,6 +94,7 @@ def convert_ddl_to_models(  # noqa: C901
     refs = {}
     tables = []
     for table in data["tables"]:
+        # logging.info(f"Processing table: {table.get('table_name', 'Unknown')}")
         for ref in table.get("constraints", {}).get("references", []):
             # References can be compopund references.  Here we split into one
             # reference per column and then attach it to the column in the next
@@ -127,6 +136,7 @@ def convert_ddl_to_models(  # noqa: C901
     for _type in data["types"]:
         _types.append(Type(**_type))
     final_data["types"] = _types
+    # logging.info(f"Converted {len(tables)} tables to models")
     return final_data
 
 
@@ -160,6 +170,7 @@ def generate_models_file(
         add_custom_types_to_generator(data["types"], generator)
 
         for table in data["tables"]:
+            # logging.info(f"Generating model for table: {table.name}")
             models_str += generator.generate_model(
                 table,
                 singular,
