@@ -103,7 +103,7 @@ class ModelGenerator:
         # and the field has a default value
         if (
             column.name.lower() == _type.lower()
-            and column.default is not None
+            and (column.default is None or column.default.lower() == "null") is False
             and not defaults_off
         ):
             _type = f'"{_type}"'
