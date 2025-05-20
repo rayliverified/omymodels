@@ -86,6 +86,10 @@ def clean_ddl(input_file, output_file):
         if "CHARACTER SET" in line:
             line = line.replace("CHARACTER SET", "CHARACTER")
 
+        # Remove NOT SECONDARY from text columns
+        if "text NOT SECONDARY" in line:
+            line = line.replace("text NOT SECONDARY", "text")
+
         # Handle GENERATED columns
         if "GENERATED ALWAYS AS" in line:
             generated_index = line.index("GENERATED ALWAYS AS")
