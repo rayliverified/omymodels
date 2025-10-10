@@ -204,17 +204,22 @@ class ModelGenerator:
         """Check if the name is a Pydantic-specific reserved name or starts with a reserved prefix."""
         pydantic_reserved_prefixes = {"dict_", "json_"}
         pydantic_reserved_names = {
+            "dict",
+            "json",
             "copy",
+            "construct",
             "parse_obj",
             "parse_raw",
             "parse_file",
             "from_orm",
-            "construct",
             "validate",
             "update_forward_refs",
             "schema",
             "schema_json",
             "register",
+            "fields",
+            "config",
+            "field_name",
         }
         return (
             any(name.startswith(prefix) for prefix in pydantic_reserved_prefixes)
