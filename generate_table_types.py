@@ -1,3 +1,4 @@
+import re
 import subprocess
 import sys
 
@@ -85,15 +86,29 @@ def clean_ddl(input_file, output_file):
         # Replace CHARACTER SET with CHARACTER
         if "CHARACTER SET" in line:
             line = line.replace("CHARACTER SET", "CHARACTER")
-
-        # Remove NOT SECONDARY from text columns
-        if "text NOT SECONDARY" in line:
-            line = line.replace("text NOT SECONDARY", "text")
+        
+        # Remove CHARACTER <charset> COLLATE <collation> from column definitions (especially ENUM)
+        # Pattern: CHARACTER utf8mb4 COLLATE utf8mb4_0900_ai_ci (or any other charset/collation)
+        if "CHARACTER" in line and "COLLATE" in line:
+            # Remove everything from CHARACTER to the end of COLLATE clause
+            line = re.sub(r'\s+CHARACTER\s+\w+\s+COLLATE\s+\w+', '', line)
 
         # Handle GENERATED columns
         if "GENERATED ALWAYS AS" in line:
             generated_index = line.index("GENERATED ALWAYS AS")
             line = line[:generated_index].rstrip() + " GENERATED ALWAYS AS 1,\n"
+
+        # Remove NOT SECONDARY from any column type
+        if "NOT SECONDARY" in line:
+            line = line.replace(" NOT SECONDARY", "")
+        
+        # Fix trailing comma before closing parenthesis (happens when we remove KEY/CONSTRAINT lines)
+        # Check if this line closes the table definition
+        if stripped_line == ");" or stripped_line.startswith(") ENGINE="):
+            # If we just skipped constraint/key lines, the last line might have a trailing comma
+            if cleaned_lines and cleaned_lines[-1].rstrip().endswith(","):
+                # Remove trailing comma from the last line
+                cleaned_lines[-1] = cleaned_lines[-1].rstrip()[:-1] + "\n"
 
         cleaned_lines.append(line)
 
@@ -115,28 +130,28 @@ def find_closing_parenthesis(s, start):
 
 
 def adjust_type_mappings():
-    """Adjusts type mappings in OhMyModels for MySQL data types."""
+    """Adjusts type mappings in OMyModels for MySQL data types."""
     from omymodels.models.pydantic import types as pydantic_types
 
+    # Map tinyint(1) usage to bool.
     pydantic_types.types_mapping.update({"tinyint(1)": "bool"})
+    # Full enum type generation is not yet supported, so map ENUM and SET to str.
     pydantic_types.types_mapping.update({"ENUM": "str"})
     pydantic_types.types_mapping.update({"SET": "str"})
 
 
 def generate_pydantic_models(ddl_file, models_output_file):
-    """Generates Pydantic models using OhMyModels."""
+    """Generates Pydantic models using OMyModels."""
     adjust_type_mappings()
     from omymodels import create_models
 
     with open(ddl_file, "r") as f:
         ddl = f.read()
-    result = create_models(
-        ddl, models_type="pydantic", no_auto_snake_case=True, table_suffix="Item"
-    )
+    result = create_models(ddl, models_type="pydantic", no_auto_snake_case=True, table_suffix="Item")
     models_code = result["code"]
-    with open(models_output_file, "w") as f:
-        f.write(models_code)
-    print(f"Pydantic models generated and saved to {models_output_file}")
+    with open(models_output_file, "w") as file:
+        file.write(models_code)
+        print(f"Pydantic models generated and saved to {models_output_file}")
 
 
 if __name__ == "__main__":
