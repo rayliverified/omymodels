@@ -235,7 +235,6 @@ class ModelGenerator:
             "register",
             "fields",
             "config",
-            "field_name",
         }
         return (
             any(name.startswith(prefix) for prefix in pydantic_reserved_prefixes)
