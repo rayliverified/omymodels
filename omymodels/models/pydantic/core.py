@@ -87,42 +87,23 @@ class ModelGenerator:
         arg_name = column.name
         field_params = None
 
-        if (
+        # Check if we need to use Field() and rename the variable
+        needs_field = (
             self._is_valid_identifier(column.name) is False
             or column.generated_as is not None
-        ):
+            or self._is_type_collision(column.name, _type)
+        )
+        
+        if needs_field:
             field_params = self.get_field_params(column, defaults_off)
             if field_params:
                 self.imports.add("Field")
-            arg_name = self._generate_valid_identifier(column.name)
+            # Only rename if it's not a valid identifier OR if there's a type collision
+            if not self._is_valid_identifier(column.name) or self._is_type_collision(column.name, _type):
+                arg_name = self._generate_valid_identifier(column.name, _type)
         else:
             if column.default is not None and not defaults_off:
                 field_params = self.get_default_value_string(column)
-
-        # Handle reference collision: if the field name equals the type name (case-insensitive)
-        # then quote the type to create a forward reference. This prevents class-scope name
-        # collisions (for example when an attribute assignment would shadow the type name).
-        # Avoid double-quoting if the type is already quoted.
-        try:
-            type_to_check = _type
-            # If it's a typing List[...] form, extract inner type for comparison and quoting
-            if isinstance(type_to_check, str) and "[" in type_to_check and type_to_check.endswith("]"):
-                inner = type_to_check[type_to_check.index("[") + 1 : -1]
-                inner_stripped = inner.strip('"')
-                if column.name.lower() == inner_stripped.lower():
-                    # quote the inner type
-                    _type = f"List[\"{inner_stripped}\"]"
-            else:
-                # Normal single type
-                if isinstance(type_to_check, str):
-                    stripped = type_to_check.strip('"')
-                    if column.name.lower() == stripped.lower() and not (
-                        type_to_check.startswith('"') and type_to_check.endswith('"')
-                    ):
-                        _type = f'"{stripped}"'
-        except Exception:
-            # Fall back to previous behavior if anything unexpected happens
-            pass
 
         column_str = column_str.format(
             arg_name=arg_name,
@@ -135,7 +116,7 @@ class ModelGenerator:
     def get_field_params(self, column: Column, defaults_off: bool) -> str:
         params = []
 
-        if not self._is_valid_identifier(column.name):
+        if not self._is_valid_identifier(column.name) or self._is_type_collision(column.name, column.type):
             params.append(f'alias="{column.name}"')
 
         if column.default is not None and not defaults_off:
@@ -241,16 +222,17 @@ class ModelGenerator:
             or name in pydantic_reserved_names
         )
 
-    def _generate_valid_identifier(self, name: str) -> str:
+    def _generate_valid_identifier(self, name: str, field_type: str = "") -> str:
         """Generate a valid Python identifier from a given name."""
         # Replace non-alphanumeric characters with underscores
         valid_name = "".join(c if c.isalnum() else "_" for c in name)
 
-        # Ensure the name doesn't start with a number
+        # Ensure the name doesn't start with a number, isn't a keyword, reserved name, or type collision
         if (
             valid_name[0].isdigit()
             or iskeyword(valid_name)
             or self._is_pydantic_reserved_name(valid_name)
+            or (field_type and self._is_type_collision(name, field_type))
         ):
             valid_name = f"f_{valid_name}"
 
@@ -269,6 +251,18 @@ class ModelGenerator:
             return f"time({time_obj.hour}, {time_obj.minute}, {time_obj.second})"
         except ValueError:
             return time_str  # Return original string if parsing fails
+
+    def _is_type_collision(self, field_name: str, field_type: str) -> bool:
+        """Check if field name collides with its type or common built-in types."""
+        # Extract base type from Optional[T] or List[T]
+        base_type = field_type
+        if "Optional[" in base_type:
+            base_type = base_type.replace("Optional[", "").replace("]", "")
+        if "List[" in base_type:
+            base_type = base_type.replace("List[", "").replace("]", "")
+        
+        # Check if field name matches the type name (case-insensitive)
+        return field_name.lower() == base_type.lower()
 
     def generate_model(
         self,
