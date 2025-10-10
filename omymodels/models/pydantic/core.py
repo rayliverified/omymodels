@@ -99,14 +99,30 @@ class ModelGenerator:
             if column.default is not None and not defaults_off:
                 field_params = self.get_default_value_string(column)
 
-        # Handle reference collision: wrap type name in quotes if it's the same as field name
-        # and the field has a default value
-        if (
-            column.name.lower() == _type.lower()
-            and (column.default is None or column.default.lower() == "null") is False
-            and not defaults_off
-        ):
-            _type = f'"{_type}"'
+        # Handle reference collision: if the field name equals the type name (case-insensitive)
+        # then quote the type to create a forward reference. This prevents class-scope name
+        # collisions (for example when an attribute assignment would shadow the type name).
+        # Avoid double-quoting if the type is already quoted.
+        try:
+            type_to_check = _type
+            # If it's a typing List[...] form, extract inner type for comparison and quoting
+            if isinstance(type_to_check, str) and "[" in type_to_check and type_to_check.endswith("]"):
+                inner = type_to_check[type_to_check.index("[") + 1 : -1]
+                inner_stripped = inner.strip('"')
+                if column.name.lower() == inner_stripped.lower():
+                    # quote the inner type
+                    _type = f"List[\"{inner_stripped}\"]"
+            else:
+                # Normal single type
+                if isinstance(type_to_check, str):
+                    stripped = type_to_check.strip('"')
+                    if column.name.lower() == stripped.lower() and not (
+                        type_to_check.startswith('"') and type_to_check.endswith('"')
+                    ):
+                        _type = f'"{stripped}"'
+        except Exception:
+            # Fall back to previous behavior if anything unexpected happens
+            pass
 
         column_str = column_str.format(
             arg_name=arg_name,
